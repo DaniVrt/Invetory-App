@@ -1,0 +1,223 @@
+:root {
+  --bg: #0f1216;
+  --surface: #1a1e24;
+  --surface-2: #22272e;
+  --border: #2d333b;
+  --text: #e6e8eb;
+  --text-dim: #9aa4af;
+  --accent: #4d8dff;
+  --accent-hover: #6ba0ff;
+  --danger: #ff5c5c;
+  --success: #4ade80;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding-bottom: 40px;
+}
+
+.hidden { display: none !important; }
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.topbar h1 { font-size: 20px; margin: 0; color: var(--accent); }
+
+#user-bar { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--text-dim); }
+
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 16px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+
+h2 { margin-top: 0; font-size: 18px; }
+h3 { font-size: 15px; color: var(--text-dim); margin-bottom: 8px; }
+
+form { display: flex; flex-direction: column; gap: 10px; }
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+input, select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 15px;
+  width: 100%;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.checkbox-label input { width: auto; }
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--accent-hover); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { color: var(--text); }
+
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  padding: 10px 16px;
+  font-size: 15px;
+}
+
+.tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+.tab {
+  flex: 1;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  padding: 10px;
+  border-radius: 8px;
+}
+.tab.active { background: var(--accent); color: #fff; }
+
+.status {
+  font-size: 13px;
+  margin: 8px 0 0;
+  min-height: 16px;
+}
+.status.error { color: var(--danger); }
+.status.success { color: var(--success); }
+
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.list-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.list-item .info { display: flex; flex-direction: column; }
+.list-item .name { font-weight: 600; }
+.list-item .meta { font-size: 12px; color: var(--text-dim); }
+.list-item .meta.expired { color: var(--danger); font-weight: 600; }
+
+.qty-controls { display: flex; align-items: center; gap: 6px; }
+.qty-controls button {
+  width: 28px; height: 28px; padding: 0;
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border);
+}
+.qty-controls span { min-width: 20px; text-align: center; }
+
+/* The rule above targets every button in this row, including delete -
+   this exempts it and lets it size to fit its text. */
+.qty-controls .btn-danger {
+  width: auto;
+  height: auto;
+  padding: 8px 14px;
+}
+
+/* A generic action row (e.g. warehouse delete-confirm) - buttons/inputs here
+   size themselves normally, unlike the fixed-size .qty-controls buttons. */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 11px;
+  text-transform: uppercase;
+  background: var(--surface-2);
+  color: var(--accent);
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.create-warehouse { margin-top: 12px; color: var(--text-dim); font-size: 14px; }
+.create-warehouse summary { cursor: pointer; color: var(--accent); }
+.create-warehouse form { margin-top: 10px; }
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.app-header h2 { margin: 0; font-size: 17px; flex: 1; text-align: center; }
+
+.app-nav { display: flex; gap: 6px; margin-bottom: 16px; }
+.nav-btn {
+  flex: 1;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  padding: 10px 4px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+.nav-btn.active { background: var(--accent); color: #fff; }
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.filter-row select { width: auto; flex: 1; min-width: 140px; }

@@ -31,6 +31,7 @@ function switchAuthTab(which) {
   $("tab-signup").classList.toggle("active", which === "signup");
   $("login-form").classList.toggle("hidden", which !== "login");
   $("signup-form").classList.toggle("hidden", which !== "signup");
+  $("forgot-password-form").classList.toggle("hidden", which !=="forgot") //new line
   setStatus("auth-status", "");
 }
 

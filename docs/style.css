@@ -56,6 +56,9 @@ h2 { margin-top: 0; font-size: 18px; }
 h3 { font-size: 15px; color: var(--text-dim); margin-bottom: 8px; }
 
 form { display: flex; flex-direction: column; gap: 10px; }
+#show-forgot-password{
+  margin-top: 12px;
+}
 
 label {
   display: flex;

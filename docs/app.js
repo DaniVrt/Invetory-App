@@ -32,6 +32,7 @@ function switchAuthTab(which) {
   $("login-form").classList.toggle("hidden", which !== "login");
   $("signup-form").classList.toggle("hidden", which !== "signup");
   $("forgot-password-form").classList.toggle("hidden", which !=="forgot") //new line
+  $("show-forgot-password").classList.toggle("active", which!=="forgot");
   setStatus("auth-status", "");
 }
 
@@ -66,14 +67,18 @@ $("logout-btn").addEventListener("click", async () => {
 $("show-forgot-password").addEventListener("click", () => {
   $("login-form").classList.add("hidden");
   $("signup-form").classList.add("hidden");
-  $("tab-login").classList.remove("active");
-  $("tab-signup").classList.remove("active");
+  $("tab-login").classList.add("hidden");
+  $("tab-signup").classList.add("hidden");
   $("forgot-password-form").classList.remove("hidden");
+  $("show-forgot-password").classList.add("hidden");
   setStatus("auth-status", "");
 });
 
 $("cancel-forgot-password").addEventListener("click", () => {
   $("forgot-password-form").classList.add("hidden");
+  $("show-forgot-password").classList.remove("hidden");      
+  $("tab-signup").classList.remove("hidden");    
+  $("tab-login").classList.remove("hidden");    
   switchAuthTab("login");
 });
 

@@ -28,8 +28,8 @@ $("tab-signup").addEventListener("click", () => switchAuthTab("signup"));
 
 function switchAuthTab(which) {
   $("tab-login").classList.toggle("active", which === "login");
-  $("tab-signup").classList.toggle("active", which === "signup");
-  $("login-form").classList.toggle("hidden", which !== "login");
+  $("tab-signup").classList.toggle("hidden", which === "signup");
+  $("login-form").classList.toggle("active", which !== "login");
   $("signup-form").classList.toggle("hidden", which !== "signup");
   $("forgot-password-form").classList.toggle("hidden", which !=="forgot")
   $("show-forgot-password").classList.toggle("active", which!=="forgot");

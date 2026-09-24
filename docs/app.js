@@ -24,14 +24,14 @@ const userBar = $("user-bar");
 // ============================================================
 
 $("tab-login").addEventListener("click", () => switchAuthTab("login"));
-//$("tab-signup").addEventListener("click", () => switchAuthTab("signup"));
+$("tab-signup").addEventListener("click", () => switchAuthTab("signup"));
 
 function switchAuthTab(which) {
   $("tab-login").classList.toggle("active", which === "login");
-  $("tab-signup").classList.toggle("hidden", which === "signup");
+  $("tab-signup").classList.toggle("active", which === "signup");
   $("login-form").classList.toggle("hidden", which !== "login");
   $("signup-form").classList.toggle("hidden", which !== "signup");
-  $("forgot-password-form").classList.toggle("hidden", which !=="forgot") //new line
+  $("forgot-password-form").classList.toggle("hidden", which !=="forgot")
   $("show-forgot-password").classList.toggle("active", which!=="forgot");
   setStatus("auth-status", "");
 }

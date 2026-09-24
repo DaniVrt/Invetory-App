@@ -1,7 +1,7 @@
 :root {
   --bg: #0f1216;
   --surface: #1a1e24;
-  --surface-2: #22272e;
+  --surface-2: #22272e; 
   --border: #2d333b;
   --text: #e6e8eb;
   --text-dim: #9aa4af;
@@ -58,8 +58,7 @@ h3 { font-size: 15px; color: var(--text-dim); margin-bottom: 8px; }
 form { display: flex; flex-direction: column; gap: 10px; }
 
 #show-forgot-password{
-  margin-top: 12px;
-}
+  margin-top: 30px;  margin-left: 249px; }
 
 label {
   display: flex;

@@ -1,5 +1,5 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-import { SUPABASE_URL, SUPABASE_KEY } from "./config.js";
+import { SUPABASE_URL, SUPABASE_KEY } from "./config.js"; 
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -24,11 +24,11 @@ const userBar = $("user-bar");
 // ============================================================
 
 $("tab-login").addEventListener("click", () => switchAuthTab("login"));
-$("tab-signup").addEventListener("click", () => switchAuthTab("signup"));
+//$("tab-signup").addEventListener("click", () => switchAuthTab("signup"));
 
 function switchAuthTab(which) {
   $("tab-login").classList.toggle("active", which === "login");
-  $("tab-signup").classList.toggle("active", which === "signup");
+  $("tab-signup").classList.toggle("hidden", which === "signup");
   $("login-form").classList.toggle("hidden", which !== "login");
   $("signup-form").classList.toggle("hidden", which !== "signup");
   $("forgot-password-form").classList.toggle("hidden", which !=="forgot") //new line

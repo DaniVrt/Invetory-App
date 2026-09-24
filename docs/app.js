@@ -3,7 +3,7 @@ import { SUPABASE_URL, SUPABASE_KEY } from "./config.js";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ---- App state ----
+// ---- App state ---- 
 const state = {
   user: null,
   warehouses: [],       // [{ sistimata_id, role, name }]

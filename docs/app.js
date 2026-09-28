@@ -23,14 +23,14 @@ const userBar = $("user-bar");
 // AUTH
 // ============================================================
 
-$("tab-login").addEventListener("click", () => switchAuthTab("login"));
-$("tab-signup").addEventListener("click", () => switchAuthTab("signup"));
+//$("tab-login").addEventListener("click", () => switchAuthTab("login"));
+//$("tab-signup").addEventListener("click", () => switchAuthTab("signup"));
 
 function switchAuthTab(which) {
-  $("tab-login").classList.toggle("active", which === "login");
-  $("tab-signup").classList.toggle("hidden", which === "signup");
+  $("tab-login").classList.toggle("hidden", which === "login");
+  //$("tab-signup").classList.toggle("active", which === "signup");
   $("login-form").classList.toggle("active", which !== "login");
-  $("signup-form").classList.toggle("hidden", which !== "signup");
+  //$("signup-form").classList.toggle("hidden", which !== "signup");
   $("forgot-password-form").classList.toggle("hidden", which !=="forgot")
   $("show-forgot-password").classList.toggle("active", which!=="forgot");
   setStatus("auth-status", "");
@@ -46,7 +46,7 @@ $("login-form").addEventListener("submit", async (e) => {
   setStatus("auth-status", "");
 });
 
-$("signup-form").addEventListener("submit", async (e) => {
+/*$("signup-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const email = $("signup-email").value.trim();
   const password = $("signup-password").value;
@@ -56,7 +56,7 @@ $("signup-form").addEventListener("submit", async (e) => {
   if (!data.session) {
     setStatus("auth-status", "Account created! Check your email to confirm, then log in.", false, true);
   }
-});
+});*/
 
 $("logout-btn").addEventListener("click", async () => {
   await supabase.auth.signOut();

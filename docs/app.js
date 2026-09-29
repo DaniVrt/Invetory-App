@@ -26,7 +26,6 @@ const userBar = $("user-bar");
 
 function switchAuthTab(which) {
   $("login-form").classList.toggle("hidden", which !== "login");
-  //$("signup-form").classList.toggle("hidden", which !== "signup");
   $("forgot-password-form").classList.toggle("hidden", which !=="forgot");
   $("show-forgot-password").classList.toggle("hidden", which !== "login");
   setStatus("auth-status", "");
@@ -41,18 +40,6 @@ $("login-form").addEventListener("submit", async (e) => {
   if (error) return setStatus("auth-status", error.message, true);
   setStatus("auth-status", "");
 });
-
-/*$("signup-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const email = $("signup-email").value.trim();
-  const password = $("signup-password").value;
-  setStatus("auth-status", "Creating account...");
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) return setStatus("auth-status", error.message, true);
-  if (!data.session) {
-    setStatus("auth-status", "Account created! Check your email to confirm, then log in.", false, true);
-  }
-});*/
 
 $("logout-btn").addEventListener("click", async () => {
   await supabase.auth.signOut();
@@ -145,7 +132,8 @@ async function showWarehousePicker() {
 async function loadWarehouses() {
   const { data, error } = await supabase
     .from("user_sistimata")
-    .select("role, sistimata_id, sistimata ( id, name )");
+    .select("role, sistimata_id, sistimata ( id, name )")
+    .eq("user_id", state.user.id);
 
   if (error) return setStatus("warehouse-status", error.message, true);
 

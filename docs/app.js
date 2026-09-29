@@ -6,9 +6,9 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // ---- App state ---- 
 const state = {
   user: null,
-  warehouses: [],       // [{ sistimata_id, role, name }]
-  currentWarehouse: null, // { id, role, name }
-  categories: [],        // [{ id, name }]
+  warehouses: [],       // [ sistimata_id, role, name ]
+  currentWarehouse: null, //  id, role, name 
+  categories: [],        // [ id, name ]
 };
 
 // ---- DOM shortcuts ----
@@ -23,16 +23,12 @@ const userBar = $("user-bar");
 // AUTH
 // ============================================================
 
-//$("tab-login").addEventListener("click", () => switchAuthTab("login"));
-//$("tab-signup").addEventListener("click", () => switchAuthTab("signup"));
 
 function switchAuthTab(which) {
-  $("tab-login").classList.toggle("hidden", which === "login");
-  //$("tab-signup").classList.toggle("active", which === "signup");
-  $("login-form").classList.toggle("active", which !== "login");
+  $("login-form").classList.toggle("hidden", which !== "login");
   //$("signup-form").classList.toggle("hidden", which !== "signup");
-  $("forgot-password-form").classList.toggle("hidden", which !=="forgot")
-  $("show-forgot-password").classList.toggle("active", which!=="forgot");
+  $("forgot-password-form").classList.toggle("hidden", which !=="forgot");
+  $("show-forgot-password").classList.toggle("hidden", which !== "login");
   setStatus("auth-status", "");
 }
 
@@ -66,20 +62,13 @@ $("logout-btn").addEventListener("click", async () => {
 
 $("show-forgot-password").addEventListener("click", () => {
   $("login-form").classList.add("hidden");
-  $("signup-form").classList.add("hidden");
-  $("tab-login").classList.add("hidden");
-  $("tab-signup").classList.add("hidden");
   $("forgot-password-form").classList.remove("hidden");
   $("show-forgot-password").classList.add("hidden");
   setStatus("auth-status", "");
 });
 
 $("cancel-forgot-password").addEventListener("click", () => {
-  $("forgot-password-form").classList.add("hidden");
-  $("show-forgot-password").classList.remove("hidden");      
-  $("tab-signup").classList.remove("hidden");    
-  $("tab-login").classList.remove("hidden");    
-  switchAuthTab("login");
+  switchAuthTab("login");   
 });
 
 $("forgot-password-form").addEventListener("submit", async (e) => {
@@ -94,7 +83,7 @@ $("forgot-password-form").addEventListener("submit", async (e) => {
   $("forgot-password-form").classList.add("hidden");
   $("forgot-password-form").reset();
   $("login-form").classList.remove("hidden");
-  $("tab-login").classList.add("active");
+  //$("tab-login").classList.add("active");
   setStatus("auth-status", "Check your email for a password reset link.", false, true);
 });
 
@@ -110,6 +99,8 @@ $("new-password-form").addEventListener("submit", async (e) => {
 
   $("new-password-form").classList.add("hidden");
   $("new-password-form").reset();
+  //authSection.classList.add("hidden");
+  //showWarehousePicker();
   setStatus("auth-status", "Password updated - you're logged in.", false, true);
 });
 
@@ -123,16 +114,16 @@ supabase.auth.onAuthStateChange((event, session) => {
     $("signup-form").classList.add("hidden");
     $("forgot-password-form").classList.add("hidden");
     $("new-password-form").classList.remove("hidden");
-    setStatus("auth-status", "Enter a new password below.");
+    setStatus("warehouse-status", "Enter a new password below.");
     return;
   }
-
+  const previousId = state.user ?. id ?? null;
   state.user = session?.user ?? null;
   if (state.user) {
     userBar.classList.remove("hidden");
     $("user-email").textContent = state.user.email;
     authSection.classList.add("hidden");
-    showWarehousePicker();
+    if (state.user.id !== previousId){showWarehousePicker();};
   } else {
     userBar.classList.add("hidden");
     authSection.classList.remove("hidden");

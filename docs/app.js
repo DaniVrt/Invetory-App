@@ -35,10 +35,16 @@ $("login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const email = $("login-email").value.trim();
   const password = $("login-password").value;
-  setStatus("auth-status", "Logging in...");
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return setStatus("auth-status", error.message, true);
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
   setStatus("auth-status", "");
+  showLoading();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  submitBtn.disabled = false;
+  if (error) {
+    hideLoading(false);
+    return setStatus("auth-status", error.message, true);
+  }
 });
 
 $("logout-btn").addEventListener("click", async () => {
@@ -112,6 +118,7 @@ supabase.auth.onAuthStateChange((event, session) => {
     authSection.classList.add("hidden");
     if (state.user.id !== previousId){showWarehousePicker();};
   } else {
+    hideLoading();
     userBar.classList.add("hidden");
     authSection.classList.remove("hidden");
     warehouseSection.classList.add("hidden");
@@ -126,7 +133,11 @@ supabase.auth.onAuthStateChange((event, session) => {
 async function showWarehousePicker() {
   warehouseSection.classList.remove("hidden");
   appSection.classList.add("hidden");
-  await loadWarehouses();
+  try {
+    await loadWarehouses();
+  } finally {
+    hideLoading();
+  }
 }
 
 async function loadWarehouses() {
@@ -394,7 +405,10 @@ $("expired-as-of").addEventListener("change", loadProducts);
 // without the user having to pick a date first.
 $("expired-as-of").value = new Date().toISOString().slice(0, 10);
 
-async function loadProducts() {
+let changedProductId = null;
+
+async function loadProducts(animate = true) {
+  if (typeof animate !== "boolean") animate = true;
   let query = supabase
     .from("iliko")
     .select("id, name, quantity, expiration_date, category_id, categories ( name )")
@@ -412,12 +426,13 @@ async function loadProducts() {
   const { data, error } = await query;
   if (error) return console.error(error);
 
-  renderProducts(data || []);
+  renderProducts(data || [], animate);
 }
 
-function renderProducts(products) {
+function renderProducts(products, animate = true) {
   const list = $("product-list");
   list.innerHTML = "";
+  list.classList.toggle("no-anim", !animate);
 
   if (products.length === 0) {
     list.innerHTML = `<li class="list-item"><span class="meta">No items found.</span></li>`;
@@ -439,28 +454,37 @@ function renderProducts(products) {
       </div>
       <div class="qty-controls">
         <button data-action="dec">−</button>
-        <span>${p.quantity}</span>
+        <span class="${p.id === changedProductId ? "pop" : ""}">${p.quantity}</span>
         <button data-action="inc">+</button>
         <button class="btn-danger" data-action="delete">Delete</button>
       </div>
     `;
     li.querySelector('[data-action="inc"]').addEventListener("click", () => changeQuantity(p.id, p.quantity + 1));
     li.querySelector('[data-action="dec"]').addEventListener("click", () => changeQuantity(p.id, Math.max(0, p.quantity - 1)));
-    li.querySelector('[data-action="delete"]').addEventListener("click", () => deleteProduct(p.id));
+    li.querySelector('[data-action="delete"]').addEventListener("click", () => deleteProduct(p.id, li));
     list.appendChild(li);
   }
+  changedProductId = null;
 }
 
 async function changeQuantity(id, newQty) {
   const { error } = await supabase.from("iliko").update({ quantity: newQty }).eq("id", id);
   if (error) return console.error(error);
-  await loadProducts();
+  changedProductId = id;
+  await loadProducts(false);
 }
 
-async function deleteProduct(id) {
-  const { error } = await supabase.from("iliko").delete().eq("id", id);
-  if (error) return console.error(error);
-  await loadProducts();
+async function deleteProduct(id, li) {
+  li?.classList.add("removing");
+  const [{ error }] = await Promise.all([
+    supabase.from("iliko").delete().eq("id", id),
+    new Promise((resolve) => setTimeout(resolve, 250)),
+  ]);
+  if (error) {
+    li?.classList.remove("removing");
+    return console.error(error);
+  }
+  await loadProducts(false);
 }
 
 $("product-has-expiration").addEventListener("change", (e) => {
@@ -545,9 +569,54 @@ async function loadMembers() {
 
 function setStatus(elId, message, isError = false, isSuccess = false) {
   const el = $(elId);
+  el.classList.remove("error", "success");
+  void el.offsetWidth; // restart the CSS animation when the same message type repeats
   el.textContent = message;
   el.classList.toggle("error", isError);
   el.classList.toggle("success", isSuccess);
+}
+
+const loadingOverlay = $("loading-overlay");
+let loadingTimer = null;
+let loadingSafetyTimer = null;
+
+let hidingLoading = false;
+let loadingShownAt = 0;
+const MIN_LOADING_MS = 1500; // shortest time a successful login keeps the loading screen up
+
+function showLoading(text = "Loading your inventory…") {
+  clearTimeout(loadingTimer);
+  clearTimeout(loadingSafetyTimer);
+  hidingLoading = false;
+  loadingShownAt = Date.now();
+  $("loading-text").textContent = text;
+  loadingOverlay.classList.remove("fade-out", "done", "hidden");
+  // Never leave the user stuck behind the overlay if something never resolves.
+  loadingSafetyTimer = setTimeout(() => hideLoading(false), 15000);
+}
+
+// complete=true: let the bar fill to 100% before fading out (successful load).
+function hideLoading(complete = true) {
+  clearTimeout(loadingSafetyTimer);
+  if (hidingLoading || loadingOverlay.classList.contains("hidden")) return;
+  hidingLoading = true;
+  const fadeOut = () => {
+    loadingOverlay.classList.add("fade-out");
+    loadingTimer = setTimeout(() => {
+      loadingOverlay.classList.add("hidden");
+      loadingOverlay.classList.remove("fade-out", "done");
+      hidingLoading = false;
+    }, 250);
+  };
+  if (complete) {
+    const wait = Math.max(0, MIN_LOADING_MS - (Date.now() - loadingShownAt));
+    loadingTimer = setTimeout(() => {
+      loadingOverlay.classList.add("done");
+      loadingTimer = setTimeout(fadeOut, 250);
+    }, wait);
+  } else {
+    fadeOut();
+  }
 }
 
 function escapeHtml(str) {

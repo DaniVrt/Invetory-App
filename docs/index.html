@@ -8,8 +8,20 @@
 </head> 
 <body>
 
+  <!-- LOADING OVERLAY (shown while logging in) -->
+  <div id="loading-overlay" class="loading-overlay hidden" role="status" aria-live="polite" aria-label="Scouts Inventory Management">
+    <div class="loading-art">
+      <picture>
+        <source media="(min-aspect-ratio: 1/1)" srcset="loading-bg-desktop.webp" />
+        <img src="loading-bg.webp" alt="" />
+      </picture>
+      <div class="loading-track"><div class="loading-fill"></div></div>
+      <p id="loading-text" class="loading-text">Loading your inventory…</p>
+    </div>
+  </div>
+
   <header class="topbar">
-    <h1>📦 Υλικό</h1>
+    <h1>⚜️</h1>
     <div id="user-bar" class="hidden">
       <span id="user-email"></span>
       <button id="logout-btn" class="btn-ghost">Log out</button>

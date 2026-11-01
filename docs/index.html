@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
-<head> 
+<head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Υλικό Inventory</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" />
 <link rel="stylesheet" href="style.css" />
-</head> 
+</head>
 <body>
 
   <!-- LOADING OVERLAY (shown while logging in) -->
@@ -21,18 +22,19 @@
   </div>
 
   <header class="topbar">
-    <h1>⚜️</h1>
+    <div class="brand"><span class="brand-mark">⚜️</span><span>Scouts inventory</span></div>
     <div id="user-bar" class="hidden">
       <span id="user-email"></span>
-      <button id="logout-btn" class="btn-ghost">Log out</button>
+      <button id="logout-btn" class="icon-btn" aria-label="Log out" title="Log out"><i class="ti ti-logout" aria-hidden="true"></i></button>
     </div>
   </header>
 
   <main class="container">
 
-    <!-- AUTH SCREEN--> 
+    <!-- AUTH SCREEN-->
     <section id="auth-section" class="card">
-      
+      <h2>Welcome back</h2>
+
       <form id="login-form">
         <input type="email" id="login-email" placeholder="Email" required />
         <input type="password" id="login-password" placeholder="Password" required />
@@ -61,13 +63,67 @@
       <p id="auth-status" class="status"></p>
     </section>
 
+    <!-- DASHBOARD (landing screen after login) -->
+    <section id="dashboard-section" class="hidden">
+      <div class="page-head">
+        <div>
+          <div id="dash-date" class="dim"></div>
+          <h2>Dashboard</h2>
+        </div>
+        <button id="dash-new-post" class="pill-btn"><i class="ti ti-plus" aria-hidden="true"></i> Announce</button>
+      </div>
+
+      <div id="dash-filter" class="seg" role="tablist">
+        <button class="on" data-filter="all">All</button>
+        <button data-filter="urgent">Urgent</button>
+        <button data-filter="posts">Announcements</button>
+      </div>
+
+      <div id="dash-feed"></div>
+    </section>
+
+    <!-- NEW ANNOUNCEMENT -->
+    <section id="post-section" class="hidden">
+      <div class="page-head">
+        <button id="post-close" class="icon-btn" aria-label="Close" title="Close"><i class="ti ti-x" aria-hidden="true"></i></button>
+        <h2>New announcement</h2>
+        <span class="head-spacer"></span>
+      </div>
+
+      <form id="post-form">
+        <label>Title
+          <input type="text" id="post-title" maxlength="80" placeholder="Check tents before Friday" required />
+        </label>
+        <label>Message
+          <textarea id="post-message" rows="4" maxlength="600" placeholder="What needs to happen?"></textarea>
+        </label>
+
+        <div class="field-label">Send to</div>
+        <div id="post-targets" class="chips"></div>
+
+        <label id="post-pin-row" class="switch-row hidden">
+          <span><b>Pin to top</b><span class="dim">Admins only. Stays above alerts.</span></span>
+          <input type="checkbox" id="post-pinned" />
+        </label>
+
+        <label>Auto-hide after (optional)
+          <input type="date" id="post-expires" />
+        </label>
+
+        <button type="submit" class="btn-primary">Post announcement</button>
+        <p id="post-status" class="status"></p>
+      </form>
+    </section>
+
     <!-- WAREHOUSE PICKER -->
-    <section id="warehouse-section" class="card hidden">
-      <h2>Your Warehouses</h2>
+    <section id="warehouse-section" class="hidden">
+      <div class="page-head">
+        <h2>Warehouses</h2>
+      </div>
       <ul id="warehouse-list" class="list"></ul>
 
       <details class="create-warehouse">
-        <summary>+ Create a new warehouse</summary>
+        <summary><i class="ti ti-plus" aria-hidden="true"></i> New warehouse</summary>
         <form id="create-warehouse-form">
           <input type="text" id="new-warehouse-name" placeholder="Warehouse name (e.g. Troop 214 Storage)" required />
           <button type="submit" class="btn-primary">Create</button>
@@ -76,18 +132,18 @@
 
       <p id="warehouse-status" class="status"></p>
 
-      <button id="open-super-admin" class="btn-ghost hidden">🛡 Manage All Participants</button>
+      <button id="open-super-admin" class="btn-ghost hidden"><i class="ti ti-shield" aria-hidden="true"></i> Manage all participants</button>
     </section>
 
     <!-- SUPER ADMIN: GLOBAL DASHBOARD (only visible to super admins) -->
     <section id="super-admin-section" class="hidden">
-      <div class="app-header">
-        <button id="back-from-super-admin" class="btn-ghost">← Warehouses</button>
-        <h2>All Participants</h2>
-        <span></span>
+      <div class="page-head">
+        <button id="back-from-super-admin" class="icon-btn" aria-label="Back to warehouses" title="Back"><i class="ti ti-arrow-left" aria-hidden="true"></i></button>
+        <h2>All participants</h2>
+        <span class="head-spacer"></span>
       </div>
 
-      <h3>All Warehouses</h3>
+      <h3>All warehouses</h3>
       <ul id="all-warehouses-list" class="list"></ul>
 
       <form id="global-add-member-form" class="card">
@@ -112,32 +168,29 @@
       <ul id="all-members-list" class="list"></ul>
     </section>
 
-    <!-- MAIN APP -->
+    <!-- MAIN APP (inside one warehouse) -->
     <section id="app-section" class="hidden">
 
-      <div class="app-header">
-        <button id="back-to-warehouses" class="btn-ghost">← Warehouses</button>
+      <div class="page-head">
+        <button id="back-to-warehouses" class="icon-btn" aria-label="Back to warehouses" title="Warehouses"><i class="ti ti-arrow-left" aria-hidden="true"></i></button>
         <h2 id="current-warehouse-name"></h2>
         <span id="current-role" class="badge"></span>
       </div>
 
-      <nav class="app-nav">
-        <button id="nav-inventory" class="nav-btn active">Inventory</button>
-        <button id="nav-add" class="nav-btn">Add Item</button>
-        <button id="nav-admin" class="nav-btn hidden">Manage Members</button>
-      </nav>
-
       <!-- INVENTORY VIEW -->
       <div id="view-inventory" class="view">
+        <div id="attention-card" class="attention hidden"></div>
+
+        <div id="inv-filter" class="seg">
+          <button class="on" data-filter="all">All</button>
+          <button data-filter="soon">Expiring</button>
+          <button data-filter="expired">Expired</button>
+        </div>
+
         <div class="filter-row">
           <select id="category-filter">
             <option value="">All categories</option>
           </select>
-          <label class="checkbox-label">
-            <input type="checkbox" id="expired-only" />
-            Show expired as of
-          </label>
-          <input type="date" id="expired-as-of" />
         </div>
         <ul id="product-list" class="list"></ul>
       </div>
@@ -145,6 +198,7 @@
       <!-- ADD ITEM VIEW -->
       <div id="view-add" class="view hidden">
         <form id="add-product-form" class="card">
+          <h3>New item</h3>
           <label>Name
             <input type="text" id="product-name" required />
           </label>
@@ -158,9 +212,9 @@
             <input type="number" id="product-quantity" min="0" value="1" required />
           </label>
 
-          <label class="checkbox-label">
+          <label class="switch-row">
+            <span>This item has an expiration date</span>
             <input type="checkbox" id="product-has-expiration" />
-            This item has an expiration date
           </label>
 
           <label id="expiration-field" class="hidden">Expiration date
@@ -196,6 +250,21 @@
     </section>
 
   </main>
+
+  <!-- FLOATING NAV: dashboard and warehouse list -->
+  <nav id="main-nav" class="float-nav hidden" aria-label="Main">
+    <button id="main-home" class="active" aria-label="Dashboard" title="Dashboard"><i class="ti ti-home" aria-hidden="true"></i></button>
+    <button id="main-warehouses" aria-label="Warehouses" title="Warehouses"><i class="ti ti-building-warehouse" aria-hidden="true"></i></button>
+    <button id="main-post" aria-label="New announcement" title="New announcement"><i class="ti ti-speakerphone" aria-hidden="true"></i></button>
+  </nav>
+
+  <!-- FLOATING NAV: inside a warehouse -->
+  <nav id="warehouse-nav" class="float-nav hidden" aria-label="Warehouse">
+    <button id="nav-home" aria-label="Dashboard" title="Dashboard"><i class="ti ti-home" aria-hidden="true"></i></button>
+    <button id="nav-inventory" class="nav-btn active" aria-label="Inventory" title="Inventory"><i class="ti ti-package" aria-hidden="true"></i></button>
+    <button id="nav-add" class="nav-btn" aria-label="Add item" title="Add item"><i class="ti ti-circle-plus" aria-hidden="true"></i></button>
+    <button id="nav-admin" class="nav-btn hidden" aria-label="Manage members" title="Manage members"><i class="ti ti-users" aria-hidden="true"></i></button>
+  </nav>
 
   <script type="module" src="app.js"></script>
 </body>

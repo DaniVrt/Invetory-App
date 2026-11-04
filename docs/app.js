@@ -1,10 +1,19 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 import { SUPABASE_URL, SUPABASE_KEY } from "./config.js"; 
 
+// Read what brought the user here BEFORE supabase-js starts and cleans the URL.
+// A password-reset email link arrives as  ...#access_token=...&type=recovery
+// and a used/expired one as              ...#error=access_denied&error_description=...
+const linkParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+const linkQuery = new URLSearchParams(window.location.search);
+const openedFromRecoveryLink = linkParams.get("type") === "recovery";
+const linkError = linkParams.get("error_description") || linkQuery.get("error_description");
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ---- App state ---- 
+// ---- App state ----
 const state = {
+  recovering: openedFromRecoveryLink, // true while the user is choosing a new password
   user: null,
   warehouses: [],       // [ sistimata_id, role, name ]
   currentWarehouse: null, //  id, role, name 
@@ -113,6 +122,18 @@ $("forgot-password-form").addEventListener("submit", async (e) => {
 // After the user clicks the reset link in their email, Supabase opens this
 // app again and fires a PASSWORD_RECOVERY event with a temporary session -
 // show the "set new password" form instead of going straight into the app.
+function showRecoveryForm() {
+  state.recovering = true;
+  userBar.classList.add("hidden");
+  showScreen("auth");
+  $("login-form").classList.add("hidden");
+  $("show-forgot-password").classList.add("hidden");
+  $("signup-form").classList.add("hidden");
+  $("forgot-password-form").classList.add("hidden");
+  $("new-password-form").classList.remove("hidden");
+  setStatus("auth-status", "Enter a new password below.");
+}
+
 $("new-password-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const password = $("new-password").value;
@@ -120,25 +141,52 @@ $("new-password-form").addEventListener("submit", async (e) => {
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return setStatus("auth-status", error.message, true);
 
+  // Done: leave recovery mode and go into the app with the session we have.
+  state.recovering = false;
   $("new-password-form").classList.add("hidden");
   $("new-password-form").reset();
-  //authSection.classList.add("hidden");
-  //showWarehousePicker();
-  setStatus("auth-status", "Password updated - you're logged in.", false, true);
+  setStatus("auth-status", "");
+  const { data } = await supabase.auth.getSession();
+  state.user = data.session?.user ?? null;
+  if (state.user) {
+    userBar.classList.remove("hidden");
+    $("user-email").textContent = state.user.email;
+    authSection.classList.add("hidden");
+    showDashboard();
+  } else {
+    switchAuthTab("login");
+    showScreen("auth");
+    setStatus("auth-status", "Password updated - please log in.", false, true);
+  }
 });
 
+// The link in the email was already used or has expired: say so instead of
+// silently showing the login page.
+if (linkError && !openedFromRecoveryLink) {
+  history.replaceState(null, "", window.location.pathname + window.location.search);
+  setStatus(
+    "auth-status",
+    "This link is invalid or has expired. Use \"Forgot password?\" to get a new one.",
+    true
+  );
+}
+
+// Opened from a reset email: go straight to the new-password form so the login
+// form never flashes, whatever order supabase-js fires its events in.
+if (openedFromRecoveryLink) showRecoveryForm();
+
 supabase.auth.onAuthStateChange((event, session) => {
+  console.debug("[auth]", event, session ? "session" : "no session");
   if (event === "PASSWORD_RECOVERY") {
-    userBar.classList.add("hidden");
-    showScreen("auth");
-    $("login-form").classList.add("hidden");
-    $("show-forgot-password").classList.add("hidden");
-    $("signup-form").classList.add("hidden");
-    $("forgot-password-form").classList.add("hidden");
-    $("new-password-form").classList.remove("hidden");
-    setStatus("warehouse-status", "Enter a new password below.");
+    showRecoveryForm();
     return;
   }
+  // While choosing a new password, other events (INITIAL_SESSION, SIGNED_IN on
+  // tab refocus, TOKEN_REFRESHED...) must not hide the form or open the app.
+  if (state.recovering && session) return;
+  const wasRecovering = state.recovering;
+  state.recovering = false;
+
   const previousId = state.user ?. id ?? null;
   state.user = session?.user ?? null;
   if (state.user) {
@@ -150,6 +198,15 @@ supabase.auth.onAuthStateChange((event, session) => {
     hideLoading();
     userBar.classList.add("hidden");
     showScreen("auth");
+    // Put the login form back (a reset may have hidden it) without clearing
+    // any message that is already showing.
+    $("new-password-form").classList.add("hidden");
+    $("forgot-password-form").classList.add("hidden");
+    $("login-form").classList.remove("hidden");
+    $("show-forgot-password").classList.remove("hidden");
+    if (wasRecovering) {
+      setStatus("auth-status", "This reset link is invalid or has expired. Use \"Forgot password?\" to get a new one.", true);
+    }
   }
 });
 

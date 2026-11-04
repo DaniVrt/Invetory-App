@@ -588,3 +588,25 @@ input, select, textarea { transition: border-color 0.2s ease; }
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- Toast messages ---------- */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 84px;               /* sits above the floating nav */
+  transform: translate(-50%, 12px);
+  max-width: min(440px, calc(100vw - 32px));
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 11px 16px;
+  border-radius: 99px;
+  font-size: 13px;
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1100;              /* above the loading overlay */
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+#toast.error { background: var(--danger-bg); color: var(--danger); }

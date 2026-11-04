@@ -1,4 +1,6 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+// Pinned to an exact version so a new release can't change the app's behaviour
+// without a deliberate update here.
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/+esm";
 import { SUPABASE_URL, SUPABASE_KEY } from "./config.js"; 
 
 // Read what brought the user here BEFORE supabase-js starts and cleans the URL.
@@ -23,11 +25,13 @@ const state = {
   alerts: [],            // expired / expiring items across all warehouses
   announcements: [],
   announcementsError: false,
+  warehousesError: false, // true when the last attempt to load warehouses failed
   dashFilter: "all",     // all | urgent | posts
 };
 
 const ALERT_DAYS = 30;        // items expiring within this many days count as "soon"
 const DONE_VISIBLE_DAYS = 7;  // completed announcements stay listed this long
+const MAX_QUANTITY = 100000;  // keep in step with supabase/hardening.sql
 
 // ---- DOM shortcuts ----
 const $ = (id) => document.getElementById(id);
@@ -36,6 +40,52 @@ const authSection = $("auth-section");
 const warehouseSection = $("warehouse-section");
 const appSection = $("app-section");
 const userBar = $("user-bar");
+
+// ---- Toasts: short messages at the bottom of the screen ----
+let toastTimer = null;
+function showToast(message, isError = false) {
+  let el = $("toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "toast";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
+    document.body.appendChild(el);
+  }
+  el.textContent = message;
+  el.classList.toggle("error", isError);
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), isError ? 6000 : 3500);
+}
+
+// Log the technical details for debugging and tell the user in plain words.
+function reportError(userMessage, error) {
+  console.error(userMessage, error);
+  showToast(userMessage, true);
+}
+
+// Run a form's submit handler one at a time: the submit button stays disabled
+// until the handler finishes, so a double tap can't save things twice.
+function onSubmitOnce(formId, handler) {
+  $(formId).addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    if (btn?.disabled) return;
+    if (btn) btn.disabled = true;
+    try {
+      await handler(e);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+}
+
+window.addEventListener("unhandledrejection", (e) => {
+  if (e.reason?.name === "AbortError") return;
+  console.error(e.reason);
+  showToast("Something went wrong. Please try again.", true);
+});
 
 // Only one screen is visible at a time; the floating nav follows the screen.
 const screens = {
@@ -230,12 +280,16 @@ async function refreshWarehouses() {
 }
 
 async function loadWarehouses() {
+  state.warehousesError = false;
   const { data, error } = await supabase
     .from("user_sistimata")
     .select("role, sistimata_id, sistimata ( id, name )")
     .eq("user_id", state.user.id);
 
-  if (error) return setStatus("warehouse-status", error.message, true);
+  if (error) {
+    state.warehousesError = true;
+    return reportError("Couldn't load your warehouses. Check your connection and try again.", error);
+  }
 
   state.warehouses = (data || []).map((row) => ({
     id: row.sistimata.id,
@@ -267,7 +321,9 @@ function renderWarehouseList() {
   list.innerHTML = "";
 
   if (state.warehouses.length === 0) {
-    list.innerHTML = `<li class="list-item"><span class="meta">No warehouses yet - create one below.</span></li>`;
+    list.innerHTML = state.warehousesError
+      ? `<li class="list-item"><span class="meta expired">Couldn't load your warehouses. Check your connection and try again.</span></li>`
+      : `<li class="list-item"><span class="meta">No warehouses yet - create one below.</span></li>`;
   }
 
   for (const wh of state.warehouses) {
@@ -300,13 +356,12 @@ function renderWarehouseList() {
   }
 }
 
-$("create-warehouse-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
+onSubmitOnce("create-warehouse-form", async () => {
   const name = $("new-warehouse-name").value.trim();
   if (!name) return;
   setStatus("warehouse-status", "Creating...");
   const { error } = await supabase.from("sistimata").insert({ name });
-  if (error) return setStatus("warehouse-status", error.message, true); //
+  if (error) return setStatus("warehouse-status", error.message, true);
   $("new-warehouse-name").value = "";
   setStatus("warehouse-status", "");
   await refreshWarehouses();
@@ -316,14 +371,20 @@ $("create-warehouse-form").addEventListener("submit", async (e) => {
 // SUPER ADMIN: GLOBAL "ALL PARTICIPANTS" DASHBOARD
 // ============================================================
 
+// Fill the "Add someone to a warehouse" dropdown, keeping the current choice
+// if that warehouse still exists.
+function fillGlobalWarehouseSelect() {
+  const wSelect = $("global-member-warehouse");
+  const previous = wSelect.value;
+  wSelect.innerHTML = state.warehouses
+    .map((w) => `<option value="${escapeHtml(w.id)}">${escapeHtml(w.name)}</option>`)
+    .join("");
+  if ([...wSelect.options].some((o) => o.value === previous)) wSelect.value = previous;
+}
+
 $("open-super-admin").addEventListener("click", async () => {
   showScreen("superadmin");
-
-  const wSelect = $("global-member-warehouse");
-  wSelect.innerHTML = state.warehouses
-    .map((w) => `<option value="${w.id}">${escapeHtml(w.name)}</option>`)
-    .join("");
-
+  fillGlobalWarehouseSelect();
   renderAllWarehousesList();
   await loadAllMembers();
 });
@@ -363,10 +424,16 @@ function renderAllWarehousesList() {
       cancelBtn.addEventListener("click", () => renderAllWarehousesList());
 
       confirmBtn.addEventListener("click", async () => {
+        confirmBtn.disabled = true;
         const { error } = await supabase.from("sistimata").delete().eq("id", wh.id);
-        if (error) return alert(error.message);
+        if (error) {
+          confirmBtn.disabled = false;
+          return alert(error.message);
+        }
         await loadWarehouses();
         renderAllWarehousesList();
+        fillGlobalWarehouseSelect();   // the deleted warehouse must leave the dropdown too
+        await loadAllMembers();        // ...and its members from the list
       });
     });
 
@@ -376,7 +443,7 @@ function renderAllWarehousesList() {
 
 async function loadAllMembers() {
   const { data, error } = await supabase.rpc("list_all_members");
-  if (error) return console.error(error);
+  if (error) return reportError("Couldn't load the participants list. Please try again.", error);
 
   const list = $("all-members-list");
   list.innerHTML = "";
@@ -403,8 +470,7 @@ async function loadAllMembers() {
   }
 }
 
-$("global-add-member-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
+onSubmitOnce("global-add-member-form", async (e) => {
   const warehouseId = $("global-member-warehouse").value;
   const email = $("global-member-email").value.trim();
   const role = $("global-member-role").value;
@@ -455,7 +521,7 @@ async function loadAlerts() {
     .not("expiration_date", "is", null)
     .lte("expiration_date", limit)
     .order("expiration_date");
-  if (error) return console.error(error);
+  if (error) return reportError("Couldn't check for expiring items. Please try again.", error);
 
   const today = isoDate(new Date());
   state.alerts = (data || []).map((p) => ({ ...p, expired: p.expiration_date <= today }));
@@ -516,6 +582,20 @@ function renderDashboard() {
   const feed = $("dash-feed");
   feed.innerHTML = "";
   const f = state.dashFilter;
+
+  // A failed load is not the same as having no warehouses: don't invite the
+  // user to create one when the real problem is the connection.
+  if (state.warehousesError) {
+    feed.innerHTML = `
+      <div class="empty">
+        <div class="ic expired"><i class="ti ti-wifi-off" aria-hidden="true"></i></div>
+        <b>Couldn't load your data</b>
+        Check your connection and try again.
+        <div><button class="btn-primary" id="retry-load">Try again</button></div>
+      </div>`;
+    $("retry-load").addEventListener("click", showDashboard);
+    return;
+  }
 
   if (state.warehouses.length === 0) {
     feed.innerHTML = `
@@ -684,8 +764,7 @@ function updatePinRow() {
 
 $("post-close").addEventListener("click", showDashboard);
 
-$("post-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
+onSubmitOnce("post-form", async () => {
   const title = $("post-title").value.trim();
   const message = $("post-message").value.trim();
   const targets = selectedTargets();
@@ -749,14 +828,20 @@ function showView(name) {
 // CATEGORIES
 // ============================================================
 
+// Each load gets a number; if a newer load has started by the time the answer
+// arrives (e.g. the user opened another warehouse), the old answer is dropped.
+let categoriesRequest = 0;
+
 async function loadCategories() {
+  const requestId = ++categoriesRequest;
   const { data, error } = await supabase
     .from("categories")
     .select("id, name")
     .eq("sistimata_id", state.currentWarehouse.id)
     .order("name");
 
-  if (error) return console.error(error);
+  if (requestId !== categoriesRequest) return;
+  if (error) return reportError("Couldn't load the categories. Please try again.", error);
   state.categories = data || [];
 
   const filter = $("category-filter");
@@ -782,7 +867,16 @@ async function getOrCreateCategory(name) {
     .select("id, name")
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // Someone created the same category a moment ago (unique violation):
+    // reload and use theirs instead of failing.
+    if (error.code === "23505") {
+      await loadCategories();
+      const again = state.categories.find((c) => c.name.toLowerCase() === name.toLowerCase());
+      if (again) return again.id;
+    }
+    throw error;
+  }
   state.categories.push(data);
   return data.id;
 }
@@ -805,14 +899,18 @@ let changedProductId = null;
 
 // Fetches every item in the warehouse; the category / expiry filters are
 // applied on the client so the "Needs attention" card always sees everything.
+let productsRequest = 0;
+
 async function loadProducts(animate = true) {
   if (typeof animate !== "boolean") animate = true;
+  const requestId = ++productsRequest;
   const { data, error } = await supabase
     .from("iliko")
     .select("id, name, quantity, expiration_date, category_id, categories ( name )")
     .eq("sistimata_id", state.currentWarehouse.id)
     .order("name");
-  if (error) return console.error(error);
+  if (requestId !== productsRequest) return;   // a newer load started; this answer is stale
+  if (error) return reportError("Couldn't load the items. Please try again.", error);
 
   state.products = data || [];
   renderProducts(animate);
@@ -907,19 +1005,39 @@ function renderProducts(animate = true) {
         <button class="del" data-action="delete" aria-label="Delete ${escapeHtml(p.name)}"><i class="ti ti-trash" aria-hidden="true"></i></button>
       </div>
     `;
-    li.querySelector('[data-action="inc"]').addEventListener("click", () => changeQuantity(p.id, p.quantity + 1));
-    li.querySelector('[data-action="dec"]').addEventListener("click", () => changeQuantity(p.id, Math.max(0, p.quantity - 1)));
+    li.querySelector('[data-action="inc"]').addEventListener("click", () => changeQuantity(p, Math.min(MAX_QUANTITY, p.quantity + 1)));
+    li.querySelector('[data-action="dec"]').addEventListener("click", () => changeQuantity(p, Math.max(0, p.quantity - 1)));
     li.querySelector('[data-action="delete"]').addEventListener("click", () => deleteProduct(p.id, li));
     list.appendChild(li);
   }
   changedProductId = null;
 }
 
-async function changeQuantity(id, newQty) {
-  const { error } = await supabase.from("iliko").update({ quantity: newQty }).eq("id", id);
-  if (error) return console.error(error);
-  changedProductId = id;
-  await loadProducts(false);
+const quantityBusy = new Set();   // items with a quantity change in flight
+
+async function changeQuantity(p, newQty) {
+  if (newQty === p.quantity || quantityBusy.has(p.id)) return;
+  quantityBusy.add(p.id);
+  try {
+    // Only apply the change if nobody else changed the quantity since we
+    // loaded it; otherwise two people pressing + at once would overwrite each
+    // other and one press would be lost without anyone noticing.
+    const { data, error } = await supabase
+      .from("iliko")
+      .update({ quantity: newQty })
+      .eq("id", p.id)
+      .eq("quantity", p.quantity)
+      .select("id");
+    if (error) return reportError("Couldn't change the quantity. Please try again.", error);
+    if (!data || data.length === 0) {
+      showToast("This item was just changed by someone else - showing the latest amount.", true);
+    } else {
+      changedProductId = p.id;
+    }
+    await loadProducts(false);
+  } finally {
+    quantityBusy.delete(p.id);
+  }
 }
 
 async function deleteProduct(id, li) {
@@ -932,7 +1050,7 @@ async function deleteProduct(id, li) {
   ]);
   if (error) {
     li?.classList.remove("removing");
-    return console.error(error);
+    return reportError("Couldn't delete the item. Please try again.", error);
   }
   await loadProducts(false);
 }
@@ -941,13 +1059,21 @@ $("product-has-expiration").addEventListener("change", (e) => {
   $("expiration-field").classList.toggle("hidden", !e.target.checked);
 });
 
-$("add-product-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
+onSubmitOnce("add-product-form", async (e) => {
   const name = $("product-name").value.trim();
   const categoryName = $("product-category").value.trim();
-  const quantity = parseInt($("product-quantity").value, 10) || 0;
+  const quantity = Math.min(MAX_QUANTITY, Math.max(0, parseInt($("product-quantity").value, 10) || 0));
   const hasExpiration = $("product-has-expiration").checked;
   const expiration = hasExpiration ? $("product-expiration").value || null : null;
+
+  if (!name || !categoryName) {
+    return setStatus("add-status", "Please fill in the name and the category.", true);
+  }
+  // Ticking the box without a date would save the item with no expiry at all,
+  // so it would never show up in the expiry alerts.
+  if (hasExpiration && !expiration) {
+    return setStatus("add-status", "Pick an expiration date, or untick the box.", true);
+  }
 
   setStatus("add-status", "Saving...");
   try {
@@ -974,8 +1100,7 @@ $("add-product-form").addEventListener("submit", async (e) => {
 // ADMIN: MEMBERS
 // ============================================================
 
-$("add-member-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
+onSubmitOnce("add-member-form", async (e) => {
   const email = $("member-email").value.trim();
   const role = $("member-role").value;
 
@@ -996,7 +1121,7 @@ async function loadMembers() {
   const { data, error } = await supabase.rpc("list_members", {
     target_sistimata_id: state.currentWarehouse.id,
   });
-  if (error) return console.error(error);
+  if (error) return reportError("Couldn't load the members. Please try again.", error);
 
   const list = $("member-list");
   list.innerHTML = "";

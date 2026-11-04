@@ -249,7 +249,7 @@ $("create-warehouse-form").addEventListener("submit", async (e) => {
   if (!name) return;
   setStatus("warehouse-status", "Creating...");
   const { error } = await supabase.from("sistimata").insert({ name });
-  if (error) return setStatus("warehouse-status", error.message, true);
+  if (error) return setStatus("Not allowed to create Warehouse as a member"); //("warehouse-status", error.message, true)
   $("new-warehouse-name").value = "";
   setStatus("warehouse-status", "");
   await refreshWarehouses();

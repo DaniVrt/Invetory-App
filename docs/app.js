@@ -923,6 +923,8 @@ async function changeQuantity(id, newQty) {
 }
 
 async function deleteProduct(id, li) {
+  const product = state.products.find((p) => String(p.id) === String(id));
+  if (!confirm(`Delete "${product?.name ?? "this item"}"? This can't be undone.`)) return;
   li?.classList.add("removing");
   const [{ error }] = await Promise.all([
     supabase.from("iliko").delete().eq("id", id),
@@ -1005,7 +1007,7 @@ async function loadMembers() {
       <div class="info">
         <span class="name">${escapeHtml(m.email)}</span>
       </div>
-      <span class="badge">${m.role}</span>
+      <span class="badge">${escapeHtml(m.role)}</span>
     `;
     list.appendChild(li);
   }
@@ -1104,8 +1106,14 @@ function timeAgo(iso) {
   return days === 1 ? "yesterday" : `${days} days ago`;
 }
 
+// Safe for both element text and attribute values (e.g. aria-label="...").
+// Quotes must be escaped too, otherwise a name containing " can break out of
+// an attribute and inject its own attributes such as onmouseover=....
 function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str ?? "";
-  return div.innerHTML;
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

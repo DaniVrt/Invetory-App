@@ -15,6 +15,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ---- App state ----
 const state = {
+  screen: "auth",        // which screen is showing (auth, dashboard, warehouses, ...)
+  view: "inventory",     // which tab is open inside a warehouse
   recovering: openedFromRecoveryLink, // true while the user is choosing a new password
   user: null,
   warehouses: [],       // [ sistimata_id, role, name ]
@@ -98,6 +100,7 @@ const screens = {
 };
 
 function showScreen(name) {
+  state.screen = name;
   for (const [key, el] of Object.entries(screens)) {
     el.classList.toggle("hidden", key !== name);
   }
@@ -818,6 +821,7 @@ $("nav-add").addEventListener("click", () => showView("add"));
 $("nav-admin").addEventListener("click", () => { showView("admin"); loadMembers(); });
 
 function showView(name) {
+  state.view = name;
   for (const n of ["inventory", "add", "admin"]) {
     $(`view-${n}`).classList.toggle("hidden", n !== name);
     $(`nav-${n}`).classList.toggle("active", n === name);
@@ -845,14 +849,18 @@ async function loadCategories() {
   state.categories = data || [];
 
   const filter = $("category-filter");
+  const previousFilter = filter.value;
   filter.innerHTML = `<option value="">All categories</option>`;
   const datalist = $("category-options");
   datalist.innerHTML = "";
 
   for (const cat of state.categories) {
-    filter.innerHTML += `<option value="${cat.id}">${escapeHtml(cat.name)}</option>`;
+    filter.innerHTML += `<option value="${escapeHtml(cat.id)}">${escapeHtml(cat.name)}</option>`;
     datalist.innerHTML += `<option value="${escapeHtml(cat.name)}"></option>`;
   }
+  // Keep the selected category if it still exists (it's gone when it became
+  // empty and was removed); otherwise fall back to "All categories".
+  if (state.categories.some((c) => String(c.id) === previousFilter)) filter.value = previousFilter;
 }
 
 async function getOrCreateCategory(name) {
@@ -885,6 +893,50 @@ async function getOrCreateCategory(name) {
 // PRODUCTS (iliko)
 // ============================================================
 
+// ---- Tags ----
+// An item can carry any of these tags. They are stored as a list of keys and
+// shown in Greek capitals: ΑΓΕΛΗ = yellow, ΟΜΑΔΑ = green, ΚΟΙΝΟΤΗΤΑ = red.
+const TAGS = [
+  { key: "agelh", label: "ΑΓΕΛΗ" },
+  { key: "omada", label: "ΟΜΑΔΑ" },
+  { key: "koinotita", label: "ΚΟΙΝΟΤΗΤΑ" },
+];
+const tagByKey = Object.fromEntries(TAGS.map((t) => [t.key, t]));
+
+// Turns off every tag control when the database has no "tags" column yet.
+let tagsSupported = true;
+function setTagsSupported(ok) {
+  tagsSupported = ok;
+  document.body.classList.toggle("no-tags", !ok);
+}
+
+function renderTagChips(container, selected = []) {
+  container.innerHTML = "";
+  for (const t of TAGS) {
+    const chip = document.createElement("label");
+    chip.className = `chip tag-chip tag-${t.key}`;
+    chip.innerHTML = `<input type="checkbox" value="${t.key}" ${selected.includes(t.key) ? "checked" : ""} />${escapeHtml(t.label)}`;
+    container.appendChild(chip);
+  }
+}
+
+function readTagChips(container) {
+  return [...container.querySelectorAll("input:checked")].map((i) => i.value);
+}
+
+function tagPills(tags) {
+  return (tags || [])
+    .filter((key) => tagByKey[key])
+    .map((key) => `<span class="tag-pill tag-${key}">${escapeHtml(tagByKey[key].label)}</span>`)
+    .join("");
+}
+
+for (const t of TAGS) {
+  $("tag-filter").insertAdjacentHTML("beforeend", `<option value="${t.key}">${escapeHtml(t.label)}</option>`);
+}
+renderTagChips($("product-tags"));
+$("tag-filter").addEventListener("change", () => renderProducts(true));
+
 $("category-filter").addEventListener("change", () => renderProducts(true));
 
 $("inv-filter").addEventListener("click", (e) => {
@@ -901,14 +953,28 @@ let changedProductId = null;
 // applied on the client so the "Needs attention" card always sees everything.
 let productsRequest = 0;
 
+const ITEM_COLUMNS = "id, name, quantity, expiration_date, category_id, categories ( name )";
+
+function fetchItems(columns) {
+  return supabase
+    .from("iliko")
+    .select(columns)
+    .eq("sistimata_id", state.currentWarehouse.id)
+    .order("name");
+}
+
 async function loadProducts(animate = true) {
   if (typeof animate !== "boolean") animate = true;
   const requestId = ++productsRequest;
-  const { data, error } = await supabase
-    .from("iliko")
-    .select("id, name, quantity, expiration_date, category_id, categories ( name )")
-    .eq("sistimata_id", state.currentWarehouse.id)
-    .order("name");
+  let { data, error } = await fetchItems(tagsSupported ? `${ITEM_COLUMNS}, tags` : ITEM_COLUMNS);
+  // 42703 = "column does not exist": the database hasn't been updated for tags
+  // yet (supabase/tags-and-cleanup.sql). Carry on without tags instead of
+  // leaving the whole list empty.
+  if (error?.code === "42703" && tagsSupported) {
+    setTagsSupported(false);
+    showToast("Tags aren't available yet: the database needs the update in supabase/tags-and-cleanup.sql", true);
+    ({ data, error } = await fetchItems(ITEM_COLUMNS));
+  }
   if (requestId !== productsRequest) return;   // a newer load started; this answer is stale
   if (error) return reportError("Couldn't load the items. Please try again.", error);
 
@@ -973,8 +1039,10 @@ function renderProducts(animate = true) {
   list.classList.toggle("no-anim", !animate);
 
   const categoryId = $("category-filter").value;
+  const tagKey = tagsSupported ? $("tag-filter").value : "";
   const products = state.products.filter((p) => {
     if (categoryId && String(p.category_id) !== categoryId) return false;
+    if (tagKey && !(p.tags || []).includes(tagKey)) return false;
     const { status } = expiryOf(p);
     if (state.invFilter === "expired") return status === "expired";
     if (state.invFilter === "soon") return status === "soon";
@@ -994,13 +1062,14 @@ function renderProducts(animate = true) {
     li.className = "list-item item";
     li.innerHTML = `
       <div class="ic ${tone}"><i class="ti ti-${iconFor(catName)}" aria-hidden="true"></i></div>
-      <div class="info">
-        <span class="name">${escapeHtml(p.name)}</span>
+      <div class="info" role="button" tabindex="0" aria-label="Edit ${escapeHtml(p.name)}">
+        <span class="name">${escapeHtml(p.name)} <i class="ti ti-pencil edit-hint" aria-hidden="true"></i></span>
         <span class="meta ${tone}">${escapeHtml(catName)}${p.expiration_date ? ` · ${escapeHtml(expiryText(e, p.expiration_date))}` : ""}</span>
+        ${tagsSupported && (p.tags || []).length ? `<span class="tags">${tagPills(p.tags)}</span>` : ""}
       </div>
       <div class="qty-controls">
         <button data-action="dec" aria-label="Decrease">−</button>
-        <span class="${p.id === changedProductId ? "pop" : ""}">${p.quantity}</span>
+        <input class="qty-input${p.id === changedProductId ? " pop" : ""}" type="number" inputmode="numeric" min="0" max="${MAX_QUANTITY}" step="1" value="${p.quantity}" aria-label="Quantity of ${escapeHtml(p.name)}" />
         <button data-action="inc" aria-label="Increase">+</button>
         <button class="del" data-action="delete" aria-label="Delete ${escapeHtml(p.name)}"><i class="ti ti-trash" aria-hidden="true"></i></button>
       </div>
@@ -1008,6 +1077,28 @@ function renderProducts(animate = true) {
     li.querySelector('[data-action="inc"]').addEventListener("click", () => changeQuantity(p, Math.min(MAX_QUANTITY, p.quantity + 1)));
     li.querySelector('[data-action="dec"]').addEventListener("click", () => changeQuantity(p, Math.max(0, p.quantity - 1)));
     li.querySelector('[data-action="delete"]').addEventListener("click", () => deleteProduct(p.id, li));
+
+    // Type the amount directly: Enter or tapping away saves it, Escape cancels.
+    const qty = li.querySelector(".qty-input");
+    qty.addEventListener("focus", () => qty.select());
+    qty.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") qty.blur();
+      if (ev.key === "Escape") { qty.value = p.quantity; qty.blur(); }
+    });
+    qty.addEventListener("change", () => {
+      const typed = parseInt(qty.value, 10);
+      if (Number.isNaN(typed)) { qty.value = p.quantity; return; }
+      const amount = Math.min(MAX_QUANTITY, Math.max(0, typed));
+      qty.value = amount;
+      changeQuantity(p, amount);
+    });
+
+    // Tap the name to rename the item or change its tags.
+    const info = li.querySelector(".info");
+    info.addEventListener("click", () => openEditSheet(p));
+    info.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openEditSheet(p); }
+    });
     list.appendChild(li);
   }
   changedProductId = null;
@@ -1053,6 +1144,10 @@ async function deleteProduct(id, li) {
     return reportError("Couldn't delete the item. Please try again.", error);
   }
   await loadProducts(false);
+  // The database removes a category once its last item is gone: reload the
+  // category list so it disappears from the filter and the suggestions too.
+  await loadCategories();
+  renderProducts(false);
 }
 
 $("product-has-expiration").addEventListener("change", (e) => {
@@ -1075,16 +1170,26 @@ onSubmitOnce("add-product-form", async (e) => {
     return setStatus("add-status", "Pick an expiration date, or untick the box.", true);
   }
 
+  const tags = tagsSupported ? readTagChips($("product-tags")) : [];
+
   setStatus("add-status", "Saving...");
   try {
-    const categoryId = await getOrCreateCategory(categoryName);
-    const { error } = await supabase.from("iliko").insert({
+    const row = {
       sistimata_id: state.currentWarehouse.id,
-      category_id: categoryId,
       name,
       quantity,
       expiration_date: expiration,
-    });
+    };
+    if (tags.length) row.tags = tags;   // only sent when used, so adding items works even before the database update
+
+    let categoryId = await getOrCreateCategory(categoryName);
+    let { error } = await supabase.from("iliko").insert({ ...row, category_id: categoryId });
+    if (error?.code === "23503") {
+      // The category was removed a moment ago (it had become empty): make it again.
+      await loadCategories();
+      categoryId = await getOrCreateCategory(categoryName);
+      ({ error } = await supabase.from("iliko").insert({ ...row, category_id: categoryId }));
+    }
     if (error) throw error;
 
     setStatus("add-status", `Added "${name}"`, false, true);
@@ -1095,6 +1200,110 @@ onSubmitOnce("add-product-form", async (e) => {
     setStatus("add-status", err.message, true);
   }
 });
+
+// ---- Edit an item: rename it and change its tags ----
+
+let editingProduct = null;
+let editReturnFocus = null;
+
+function openEditSheet(p) {
+  editingProduct = p;
+  editReturnFocus = document.activeElement;
+  $("edit-name").value = p.name;
+  renderTagChips($("edit-tags"), p.tags || []);
+  setStatus("edit-status", "");
+  $("edit-sheet").classList.remove("hidden");
+  $("edit-name").focus();
+  $("edit-name").select();
+}
+
+function closeEditSheet() {
+  $("edit-sheet").classList.add("hidden");
+  editingProduct = null;
+  editReturnFocus?.focus?.();
+}
+
+$("edit-cancel").addEventListener("click", closeEditSheet);
+$("edit-sheet").addEventListener("click", (e) => {
+  if (e.target === $("edit-sheet")) closeEditSheet();   // tap outside the card
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("edit-sheet").classList.contains("hidden")) closeEditSheet();
+});
+
+onSubmitOnce("edit-form", async () => {
+  const p = editingProduct;
+  if (!p) return;
+  const name = $("edit-name").value.trim();
+  if (!name) return setStatus("edit-status", "The name can't be empty.", true);
+
+  const tags = readTagChips($("edit-tags"));
+  const patch = {};
+  if (name !== p.name) patch.name = name;
+  if (tagsSupported && [...tags].sort().join() !== [...(p.tags || [])].sort().join()) patch.tags = tags;
+  if (Object.keys(patch).length === 0) return closeEditSheet();   // nothing changed
+
+  setStatus("edit-status", "Saving...");
+  const { data, error } = await supabase.from("iliko").update(patch).eq("id", p.id).select("id");
+  if (error) return setStatus("edit-status", error.message, true);
+  if (!data || data.length === 0) {
+    return setStatus("edit-status", "Couldn't save: the item may have been deleted, or you may not have permission.", true);
+  }
+  closeEditSheet();
+  showToast("Saved");
+  await loadProducts(false);
+});
+
+// ============================================================
+// REFRESH BUTTON (top bar)
+// Reloads whatever is on screen (dashboard, warehouse list, items, members)
+// without reloading the page.
+// ============================================================
+
+let refreshing = false;
+
+async function refreshCurrentScreen() {
+  if (refreshing || !state.user) return;
+  refreshing = true;
+  const btn = $("refresh-btn");
+  btn.disabled = true;
+  btn.classList.add("spinning");
+  const startedAt = Date.now();
+  try {
+    switch (state.screen) {
+      case "dashboard":
+        await loadWarehouses();
+        await Promise.all([loadAlerts(), loadAnnouncements()]);
+        renderDashboard();
+        break;
+      case "warehouses":
+        await refreshWarehouses();
+        break;
+      case "superadmin":
+        await loadWarehouses();
+        fillGlobalWarehouseSelect();
+        renderAllWarehousesList();
+        await loadAllMembers();
+        break;
+      case "app":
+        if (state.view === "admin") {
+          await loadMembers();
+        } else {
+          await loadCategories();
+          await loadProducts(false);
+        }
+        break;
+    }
+  } finally {
+    // keep the spinner visible long enough to notice that something happened
+    await new Promise((r) => setTimeout(r, Math.max(0, 500 - (Date.now() - startedAt))));
+    refreshing = false;
+    btn.disabled = false;
+    btn.classList.remove("spinning");
+  }
+}
+
+$("refresh-btn").addEventListener("click", refreshCurrentScreen);
 
 // ============================================================
 // ADMIN: MEMBERS

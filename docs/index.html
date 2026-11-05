@@ -25,6 +25,7 @@
     <div class="brand"><span class="brand-mark">⚜️</span><span>Scouts inventory</span></div>
     <div id="user-bar" class="hidden">
       <span id="user-email"></span>
+      <button id="refresh-btn" class="icon-btn" aria-label="Refresh" title="Refresh"><i class="ti ti-refresh" aria-hidden="true"></i></button>
       <button id="logout-btn" class="icon-btn" aria-label="Log out" title="Log out"><i class="ti ti-logout" aria-hidden="true"></i></button>
     </div>
   </header>
@@ -191,6 +192,9 @@
           <select id="category-filter">
             <option value="">All categories</option>
           </select>
+          <select id="tag-filter" class="tag-ui" aria-label="Filter by tag">
+            <option value="">All tags</option>
+          </select>
         </div>
         <ul id="product-list" class="list"></ul>
       </div>
@@ -220,6 +224,11 @@
           <label id="expiration-field" class="hidden">Expiration date
             <input type="date" id="product-expiration" />
           </label>
+
+          <div class="tag-ui">
+            <span class="field-label">Tags</span>
+            <div id="product-tags" class="chips"></div>
+          </div>
 
           <button type="submit" class="btn-primary">Add to inventory</button>
           <p id="add-status" class="status"></p>
@@ -259,6 +268,25 @@
   </nav>
 
   <!-- FLOATING NAV: inside a warehouse -->
+  <!-- EDIT ITEM SHEET -->
+  <div id="edit-sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+    <form id="edit-form" class="card sheet-card">
+      <h3 id="edit-title">Edit item</h3>
+      <label>Name
+        <input type="text" id="edit-name" maxlength="120" required autocomplete="off" />
+      </label>
+      <div class="tag-ui">
+        <span class="field-label">Tags</span>
+        <div id="edit-tags" class="chips"></div>
+      </div>
+      <p id="edit-status" class="status"></p>
+      <div class="sheet-actions">
+        <button type="button" id="edit-cancel" class="btn-ghost">Cancel</button>
+        <button type="submit" class="btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+
   <nav id="warehouse-nav" class="float-nav hidden" aria-label="Warehouse">
     <button id="nav-home" aria-label="Dashboard" title="Dashboard"><i class="ti ti-home" aria-hidden="true"></i></button>
     <button id="nav-inventory" class="nav-btn active" aria-label="Inventory" title="Inventory"><i class="ti ti-package" aria-hidden="true"></i></button>

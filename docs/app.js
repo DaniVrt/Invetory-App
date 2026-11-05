@@ -953,23 +953,14 @@ let changedProductId = null;
 // applied on the client so the "Needs attention" card always sees everything.
 let productsRequest = 0;
 
-<<<<<<< HEAD
-async function loadProducts(animate = true) {
-  if (typeof animate !== "boolean") animate = true;
-  const requestId = ++productsRequest;
-  const { data, error } = await supabase
-=======
 const ITEM_COLUMNS = "id, name, quantity, expiration_date, category_id, categories ( name )";
 
 function fetchItems(columns) {
   return supabase
->>>>>>> dev
     .from("iliko")
     .select(columns)
     .eq("sistimata_id", state.currentWarehouse.id)
     .order("name");
-<<<<<<< HEAD
-=======
 }
 
 async function loadProducts(animate = true) {
@@ -984,7 +975,6 @@ async function loadProducts(animate = true) {
     showToast("Tags aren't available yet: the database needs the update in supabase/tags-and-cleanup.sql", true);
     ({ data, error } = await fetchItems(ITEM_COLUMNS));
   }
->>>>>>> dev
   if (requestId !== productsRequest) return;   // a newer load started; this answer is stale
   if (error) return reportError("Couldn't load the items. Please try again.", error);
 
@@ -1180,11 +1170,8 @@ onSubmitOnce("add-product-form", async (e) => {
     return setStatus("add-status", "Pick an expiration date, or untick the box.", true);
   }
 
-<<<<<<< HEAD
-=======
   const tags = tagsSupported ? readTagChips($("product-tags")) : [];
 
->>>>>>> dev
   setStatus("add-status", "Saving...");
   try {
     const row = {

@@ -157,7 +157,8 @@ button {
   border: 1.5px solid var(--border);
 }
 .btn-ghost:hover { color: var(--text); border-color: var(--text-dim); }
-#show-forgot-password { margin-top: 14px; width: 100%; }
+#show-forgot-password, #show-signup { margin-top: 14px; width: 100%; }
+#show-signup + #show-forgot-password { margin-top: 8px; }
 #open-super-admin { margin-top: 14px; width: 100%; }
 
 .btn-danger {

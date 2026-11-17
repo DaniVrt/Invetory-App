@@ -118,9 +118,54 @@ function showScreen(name) {
 
 function switchAuthTab(which) {
   $("login-form").classList.toggle("hidden", which !== "login");
+  $("signup-form").classList.toggle("hidden", which !== "signup");
   $("forgot-password-form").classList.toggle("hidden", which !=="forgot");
   $("show-forgot-password").classList.toggle("hidden", which !== "login");
+  $("show-signup").classList.toggle("hidden", which !== "login");
+  document.querySelector("#auth-section h2").textContent = which === "signup" ? "Create your account" : "Welcome back";
   setStatus("auth-status", "");
+}
+
+// ---- Sign up ----
+// Share  https://danivrt.github.io/Invetory-App/?signup  to open this form directly.
+
+$("show-signup").addEventListener("click", () => switchAuthTab("signup"));
+$("cancel-signup").addEventListener("click", () => switchAuthTab("login"));
+
+$("signup-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = $("signup-email").value.trim();
+  const password = $("signup-password").value;
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  setStatus("auth-status", "Creating your account...");
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    // The confirmation email sends them back to the app (without ?signup).
+    options: { emailRedirectTo: window.location.origin + window.location.pathname },
+  });
+  submitBtn.disabled = false;
+  if (error) return setStatus("auth-status", error.message, true);
+
+  // With email confirmation on, an already-registered address comes back as a
+  // user with no identities instead of an error (so emails can't be probed).
+  if (data.user && data.user.identities?.length === 0) {
+    return setStatus("auth-status", "An account with this email already exists. Log in, or use \"Forgot password?\".", true);
+  }
+
+  // Confirmation turned off in Supabase: a session already exists and the auth
+  // listener below signs them straight in.
+  if (data.session) return;
+
+  $("signup-form").reset();
+  switchAuthTab("login");
+  setStatus("auth-status", "Account created. Check your email and click the confirmation link, then log in.", false, true);
+});
+
+// Opened from the shared sign-up link
+if (linkQuery.has("signup") || window.location.hash === "#signup") {
+  switchAuthTab("signup");
 }
 
 $("login-form").addEventListener("submit", async (e) => {
@@ -149,6 +194,7 @@ $("show-forgot-password").addEventListener("click", () => {
   $("login-form").classList.add("hidden");
   $("forgot-password-form").classList.remove("hidden");
   $("show-forgot-password").classList.add("hidden");
+  $("show-signup").classList.add("hidden");
   setStatus("auth-status", "");
 });
 
@@ -165,10 +211,8 @@ $("forgot-password-form").addEventListener("submit", async (e) => {
   });
   if (error) return setStatus("auth-status", error.message, true);
 
-  $("forgot-password-form").classList.add("hidden");
   $("forgot-password-form").reset();
-  $("login-form").classList.remove("hidden");
-  //$("tab-login").classList.add("active");
+  switchAuthTab("login");
   setStatus("auth-status", "Check your email for a password reset link.", false, true);
 });
 
@@ -181,6 +225,7 @@ function showRecoveryForm() {
   showScreen("auth");
   $("login-form").classList.add("hidden");
   $("show-forgot-password").classList.add("hidden");
+  $("show-signup").classList.add("hidden");
   $("signup-form").classList.add("hidden");
   $("forgot-password-form").classList.add("hidden");
   $("new-password-form").classList.remove("hidden");
@@ -255,8 +300,16 @@ supabase.auth.onAuthStateChange((event, session) => {
     // any message that is already showing.
     $("new-password-form").classList.add("hidden");
     $("forgot-password-form").classList.add("hidden");
-    $("login-form").classList.remove("hidden");
-    $("show-forgot-password").classList.remove("hidden");
+    // Keep the sign-up form if that's what the person opened (shared link).
+    if (!$("signup-form").classList.contains("hidden")) {
+      $("login-form").classList.add("hidden");
+      $("show-forgot-password").classList.add("hidden");
+      $("show-signup").classList.add("hidden");
+    } else {
+      $("login-form").classList.remove("hidden");
+      $("show-forgot-password").classList.remove("hidden");
+      $("show-signup").classList.remove("hidden");
+    }
     if (wasRecovering) {
       setStatus("auth-status", "This reset link is invalid or has expired. Use \"Forgot password?\" to get a new one.", true);
     }
@@ -323,10 +376,15 @@ function renderWarehouseList() {
   const list = $("warehouse-list");
   list.innerHTML = "";
 
+  // Creating warehouses is limited to super admins (database policy).
+  document.querySelector(".create-warehouse").classList.toggle("hidden", !state.isSuperAdmin);
+
   if (state.warehouses.length === 0) {
     list.innerHTML = state.warehousesError
       ? `<li class="list-item"><span class="meta expired">Couldn't load your warehouses. Check your connection and try again.</span></li>`
-      : `<li class="list-item"><span class="meta">No warehouses yet - create one below.</span></li>`;
+      : `<li class="list-item"><span class="meta">${state.isSuperAdmin
+          ? "No warehouses yet - create one below."
+          : "No warehouses yet - ask your admin to add you."}</span></li>`;
   }
 
   for (const wh of state.warehouses) {
@@ -601,14 +659,22 @@ function renderDashboard() {
   }
 
   if (state.warehouses.length === 0) {
-    feed.innerHTML = `
+    // Only super admins can create warehouses; everyone else waits to be added.
+    feed.innerHTML = state.isSuperAdmin
+      ? `
       <div class="empty">
         <div class="ic"><i class="ti ti-building-warehouse" aria-hidden="true"></i></div>
         <b>Create your first warehouse</b>
         Set one up to start tracking inventory and posting announcements.
         <div><button class="btn-primary" id="empty-create">Create warehouse</button></div>
+      </div>`
+      : `
+      <div class="empty">
+        <div class="ic"><i class="ti ti-user-check" aria-hidden="true"></i></div>
+        <b>You're almost in</b>
+        Your account is ready. Ask your admin to add <b style="display:inline;font-size:inherit">${escapeHtml(state.user?.email ?? "your email")}</b> to the warehouse, then press refresh.
       </div>`;
-    $("empty-create").addEventListener("click", showWarehousePicker);
+    $("empty-create")?.addEventListener("click", showWarehousePicker);
     return;
   }
 

@@ -43,11 +43,13 @@
       </form>
 
       <form id="signup-form" class="hidden">
-        <input type="email" id="signup-email" placeholder="Email" required />
-        <input type="password" id="signup-password" placeholder="Password (min 6 chars)" required minlength="6" />
-        <button type="submit" class="btn-primary">Sign up</button>
+        <input type="email" id="signup-email" placeholder="Email" autocomplete="email" required />
+        <input type="password" id="signup-password" placeholder="Password (min 6 chars)" autocomplete="new-password" required minlength="6" />
+        <button type="submit" class="btn-primary">Create account</button>
+        <button type="button" id="cancel-signup" class="btn-ghost">Back to login</button>
       </form>
 
+      <button type="button" id="show-signup" class="btn-ghost">Create an account</button>
       <button type ="button" id="show-forgot-password" class="btn-ghost">Forgot password?</button>
       <form id="forgot-password-form" class="hidden">
         <input type="email" id="forgot-email" placeholder="Your email" required />
